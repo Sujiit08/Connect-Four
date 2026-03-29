@@ -4,783 +4,615 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connect Four — Online Multiplayer</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #07070f;
-  --panel: #0f0f1c;
-  --border: #1e1e32;
-  --border2: #2a2a45;
-  --red: #ff2d55;
-  --yellow: #ffd60a;
-  --blue: #00b4ff;
-  --green: #00ff88;
-  --muted: #4a4a6a;
-  --text: #d8daf0;
-  --dim: #1a1a2e;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100%;background:var(--bg);}
-body{
-  font-family:'IBM Plex Mono',monospace;
-  color:var(--text);
-  display:flex;align-items:center;justify-content:center;
-  min-height:100vh;
-  overflow-x:hidden;
-}
-body::before{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:
-    radial-gradient(ellipse at 10% 10%,rgba(0,180,255,.07) 0,transparent 50%),
-    radial-gradient(ellipse at 90% 90%,rgba(255,45,85,.07) 0,transparent 50%),
-    radial-gradient(ellipse at 50% 110%,rgba(0,255,136,.03) 0,transparent 40%);
-}
-
-/* SCREEN */
-.screen{
-  position:relative;z-index:1;
-  width:100%;max-width:440px;padding:16px;
-  animation:fadeUp .35s ease;
-}
-.screen.hidden{display:none!important;}
-#game-screen{max-width:560px;}
+:root{--bg:#080810;--panel:#10101c;--panel2:#161624;--border:#252538;--red:#ff2d55;--yellow:#ffd60a;--blue:#0af;--green:#0f0;--dim:#2e2e48;--text:#e0e0f0;--text-dim:#5a5a7a;--text-mid:#9090b0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 16px 30px;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 15% 15%,rgba(10,170,255,.06) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 85% 85%,rgba(255,45,85,.06) 0%,transparent 70%);pointer-events:none;z-index:0}
+.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(8,8,16,.92);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:50}
+.tb-logo{font-family:'Orbitron',sans-serif;font-size:.72rem;font-weight:900;letter-spacing:.2em;background:linear-gradient(90deg,var(--red),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.tb-right{display:flex;align-items:center;gap:10px}
+.user-chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:.62rem;color:var(--blue);letter-spacing:.05em;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-logout{background:transparent;border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text-dim);font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.15em;cursor:pointer;transition:all .2s}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+.screen{position:relative;z-index:1;width:100%;max-width:440px;animation:fadeUp .3s ease;padding-top:64px}
+.screen.hidden{display:none!important}
+#game-screen{max-width:560px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-
-/* LOGO */
-.logo{text-align:center;margin-bottom:24px;}
-.logo h1{
-  font-family:'Orbitron',sans-serif;font-size:1.75rem;font-weight:900;letter-spacing:.08em;
-  background:linear-gradient(120deg,var(--red) 0%,var(--yellow) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.logo p{color:var(--muted);font-size:.6rem;letter-spacing:.35em;margin-top:5px;}
-
-/* CARD */
-.card{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;padding:24px;margin-bottom:12px;
-}
-.card-title{
-  font-family:'Orbitron',sans-serif;font-size:.7rem;
-  letter-spacing:.2em;color:var(--blue);margin-bottom:20px;
-}
-
-/* TABS */
-.tabs{
-  display:flex;background:var(--bg);border:1px solid var(--border);
-  border-radius:8px;padding:4px;margin-bottom:20px;
-}
-.tab{
-  flex:1;padding:10px;text-align:center;font-size:.65rem;
-  letter-spacing:.15em;font-family:'Orbitron',sans-serif;
-  cursor:pointer;border-radius:6px;color:var(--muted);transition:all .2s;
-}
-.tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.5);}
-
-/* FIELDS */
-.field{margin-bottom:14px;}
-.field label{
-  display:block;font-size:.58rem;letter-spacing:.2em;
-  color:var(--muted);margin-bottom:7px;text-transform:uppercase;
-}
-input{
-  width:100%;background:var(--bg);border:1px solid var(--border);
-  border-radius:8px;padding:11px 14px;color:var(--text);
-  font-family:'IBM Plex Mono',monospace;font-size:.85rem;
-  outline:none;transition:border-color .2s;
-}
-input:focus{border-color:var(--blue);}
-input::placeholder{color:var(--muted);}
-
-/* BUTTONS */
-.btn{
-  display:block;width:100%;padding:13px;border:none;border-radius:8px;
-  font-family:'Orbitron',sans-serif;font-size:.68rem;font-weight:700;
-  letter-spacing:.18em;cursor:pointer;transition:all .2s;margin-bottom:10px;
-}
-.btn:last-child{margin-bottom:0;}
-.btn-red{background:linear-gradient(135deg,var(--red),#ff6b81);color:#fff;}
-.btn-red:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(255,45,85,.35);}
-.btn-blue{background:linear-gradient(135deg,#0077cc,var(--blue));color:#fff;}
-.btn-blue:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(0,180,255,.35);}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
-.btn-ghost:hover{border-color:var(--blue);color:var(--blue);}
-
-/* MESSAGES */
-.err{color:var(--red);font-size:.65rem;text-align:center;margin-top:10px;min-height:16px;letter-spacing:.05em;}
-.suc{color:var(--green);font-size:.65rem;text-align:center;margin-top:10px;}
-.divider{
-  display:flex;align-items:center;gap:10px;margin:14px 0;
-  color:var(--muted);font-size:.58rem;letter-spacing:.2em;
-}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
-
-/* COLOR PICK */
-.color-row{display:flex;gap:10px;}
-.c-opt{
-  flex:1;padding:10px 8px;border-radius:8px;border:2px solid var(--border);
-  background:var(--bg);cursor:pointer;text-align:center;
-  font-size:.62rem;letter-spacing:.1em;transition:all .2s;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-}
-.c-dot{width:20px;height:20px;border-radius:50%;}
-.c-opt.red .c-dot{background:var(--red);}
-.c-opt.yellow .c-dot{background:var(--yellow);}
-.c-opt.red{color:var(--red);}
-.c-opt.yellow{color:var(--yellow);}
-.c-opt.sel.red{border-color:var(--red);background:rgba(255,45,85,.1);}
-.c-opt.sel.yellow{border-color:var(--yellow);background:rgba(255,214,10,.1);}
-
-/* USER BADGE */
-.u-badge{
-  display:flex;align-items:center;justify-content:space-between;
-  background:var(--bg);border:1px solid var(--border);
-  border-radius:8px;padding:10px 14px;margin-bottom:16px;
-}
-.u-name{font-size:.8rem;font-weight:700;color:var(--blue);}
-.u-email{font-size:.58rem;color:var(--muted);margin-top:2px;}
-.u-logout{
-  background:none;border:1px solid var(--border);color:var(--muted);
-  padding:5px 10px;border-radius:6px;font-size:.58rem;letter-spacing:.1em;
-  cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .2s;
-}
-.u-logout:hover{border-color:var(--red);color:var(--red);}
-
-/* LOBBY */
-.rc-box{
-  background:var(--bg);border:1px dashed var(--border2);
-  border-radius:10px;padding:18px;text-align:center;margin:14px 0;
-}
-.rc-lbl{font-size:.58rem;letter-spacing:.25em;color:var(--muted);margin-bottom:8px;}
-.rc-code{
-  font-family:'Orbitron',sans-serif;font-size:2.4rem;font-weight:900;
-  color:var(--green);letter-spacing:.4em;
-  text-shadow:0 0 24px rgba(0,255,136,.4);
-}
-.p-slots{display:flex;gap:10px;margin:14px 0;}
-.p-slot{
-  flex:1;background:var(--bg);border:1px solid var(--border);
-  border-radius:10px;padding:12px;text-align:center;
-}
-.ps-dot{width:16px;height:16px;border-radius:50%;background:var(--dim);margin:0 auto 8px;}
-.p-slot.has-red .ps-dot{background:var(--red);box-shadow:0 0 8px var(--red);}
-.p-slot.has-yellow .ps-dot{background:var(--yellow);box-shadow:0 0 8px var(--yellow);}
-.ps-name{font-size:.68rem;color:var(--muted);}
-.p-slot.has-red .ps-name,.p-slot.has-yellow .ps-name{color:var(--text);}
-.lb-status{font-size:.65rem;color:var(--muted);text-align:center;letter-spacing:.1em;}
-.blink{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);margin-right:7px;animation:blink 1.5s ease infinite;}
+.logo{text-align:center;margin-bottom:26px}
+.logo h1{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;letter-spacing:.08em;background:linear-gradient(135deg,var(--red) 0%,var(--yellow) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 18px rgba(255,45,85,.3))}
+.logo p{color:var(--text-dim);font-size:.6rem;letter-spacing:.3em;margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:26px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:-1px;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,rgba(10,170,255,.4),transparent)}
+.card-title{font-family:'Orbitron',sans-serif;font-size:.7rem;letter-spacing:.25em;color:var(--blue);margin-bottom:20px}
+.tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;margin-bottom:20px;gap:3px}
+.tab{flex:1;padding:9px;text-align:center;font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.18em;cursor:pointer;border-radius:7px;color:var(--text-dim);transition:all .2s;border:none;background:transparent}
+.tab.active{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.58rem;letter-spacing:.22em;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px}
+.field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;outline:none;transition:border-color .2s,box-shadow .2s}
+.field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,170,255,.1)}
+.color-pick{display:flex;gap:8px}
+.color-opt{flex:1;padding:10px 6px;border-radius:8px;border:2px solid var(--border);background:var(--bg);cursor:pointer;text-align:center;font-size:.6rem;letter-spacing:.12em;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:'Space Mono',monospace;color:var(--text-dim)}
+.color-opt .dot{width:20px;height:20px;border-radius:50%}
+.color-opt.red .dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+.color-opt.yel .dot{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+.color-opt.red.active{border-color:var(--red);background:rgba(255,45,85,.1);color:var(--red)}
+.color-opt.yel.active{border-color:var(--yellow);background:rgba(255,214,10,.1);color:var(--yellow)}
+.btn{width:100%;padding:13px;border:none;border-radius:9px;font-family:'Orbitron',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.2em;cursor:pointer;transition:all .2s;margin-bottom:8px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--red),#ff6080);color:#fff}
+.btn-primary:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(255,45,85,.4)}
+.btn-blue{background:linear-gradient(135deg,#007acc,var(--blue));color:#fff}
+.btn-blue:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,170,255,.35)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-dim)}
+.btn-ghost:not(:disabled):hover{border-color:var(--blue);color:var(--blue)}
+.divider{display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:.58rem;letter-spacing:.2em;margin:14px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.err{color:var(--red);font-size:.66rem;text-align:center;margin-top:10px;min-height:18px;letter-spacing:.05em}
+.suc{color:var(--green);font-size:.66rem;text-align:center;margin-top:10px;min-height:18px}
+.room-box{background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:20px;text-align:center;margin:16px 0}
+.room-box .rl{font-size:.58rem;color:var(--text-dim);letter-spacing:.2em;margin-bottom:8px}
+.room-code{font-family:'Orbitron',sans-serif;font-size:2.4rem;font-weight:900;color:var(--green);letter-spacing:.4em;text-shadow:0 0 24px rgba(0,255,0,.5)}
+.prow{display:flex;gap:10px;margin:14px 0}
+.pslot{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;transition:all .3s}
+.pslot .pdot{width:18px;height:18px;border-radius:50%;background:var(--dim);margin:0 auto 8px;transition:all .3s}
+.pslot.pr{border-color:rgba(255,45,85,.4);background:rgba(255,45,85,.05)}
+.pslot.pr .pdot{background:var(--red);box-shadow:0 0 10px var(--red)}
+.pslot.py{border-color:rgba(255,214,10,.4);background:rgba(255,214,10,.05)}
+.pslot.py .pdot{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+.pname{font-size:.7rem;color:var(--text-mid)}
+.status-line{font-size:.63rem;color:var(--text-dim);letter-spacing:.1em;display:flex;align-items:center;gap:8px;margin-top:4px}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.5s ease infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-
-/* GAME HEADER */
-.g-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.g-logo{font-family:'Orbitron',sans-serif;font-size:.6rem;color:var(--muted);letter-spacing:.2em;}
-.turn-pill{
-  display:flex;align-items:center;gap:7px;
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:20px;padding:6px 14px;font-size:.58rem;letter-spacing:.12em;
-}
-.t-pip{width:8px;height:8px;border-radius:50%;transition:all .3s;}
-.leave-btn{
-  background:none;border:1px solid var(--border);color:var(--muted);
-  padding:5px 10px;border-radius:6px;font-size:.58rem;letter-spacing:.1em;
-  cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .2s;
-}
-.leave-btn:hover{border-color:var(--red);color:var(--red);}
-
-/* SCORES */
-.scores{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
-.sc{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:10px;padding:12px 14px;
-  display:flex;align-items:center;justify-content:space-between;transition:all .3s;
-}
-.sc.glow-red{border-color:rgba(255,45,85,.5);box-shadow:0 0 12px rgba(255,45,85,.15);}
-.sc.glow-yellow{border-color:rgba(255,214,10,.5);box-shadow:0 0 12px rgba(255,214,10,.15);}
-.sc-name{font-size:.62rem;color:var(--muted);letter-spacing:.08em;}
-.sc-lbl{font-size:.52rem;color:var(--muted);opacity:.6;margin-top:2px;}
-.sc-num{font-family:'Orbitron',sans-serif;font-size:1.5rem;font-weight:900;}
-.sc.red .sc-num{color:var(--red);}
-.sc.yellow .sc-num{color:var(--yellow);}
-
-/* BOARD */
-.board-wrap{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;padding:14px;position:relative;overflow:hidden;
-}
-.hover-row{
-  display:grid;grid-template-columns:repeat(7,1fr);gap:6px;
-  margin-bottom:7px;height:26px;
-}
-.h-cell{
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  border-radius:5px;transition:background .15s;
-}
-.h-cell:hover{background:rgba(255,255,255,.04);}
-.h-arr{
-  width:0;height:0;
-  border-left:5px solid transparent;border-right:5px solid transparent;
-  border-top:7px solid transparent;transition:border-top-color .15s;
-}
-.board{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-.cell{
-  aspect-ratio:1;border-radius:50%;
-  background:var(--bg);border:1px solid var(--border);
-  cursor:pointer;transition:border-color .15s;
-}
-.cell:hover{border-color:var(--border2);}
-.cell.red{
-  background:var(--red);border-color:var(--red);
-  box-shadow:0 0 8px rgba(255,45,85,.4),inset 0 -2px 5px rgba(0,0,0,.25);
-  animation:pop .2s ease;
-}
-.cell.yellow{
-  background:var(--yellow);border-color:var(--yellow);
-  box-shadow:0 0 8px rgba(255,214,10,.4),inset 0 -2px 5px rgba(0,0,0,.25);
-  animation:pop .2s ease;
-}
-.cell.win{animation:winpulse .65s ease infinite alternate;}
-@keyframes pop{from{transform:scale(.45);opacity:0}to{transform:scale(1);opacity:1}}
-@keyframes winpulse{from{transform:scale(1)}to{transform:scale(1.12)}}
-
-/* WIN OVERLAY */
-.win-ov{
-  position:absolute;inset:0;
-  background:rgba(7,7,15,.92);backdrop-filter:blur(5px);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  border-radius:14px;z-index:10;animation:fadeUp .3s ease;
-}
-.win-ov.hidden{display:none;}
-.w-emoji{font-size:2.6rem;margin-bottom:8px;}
-.w-title{font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;margin-bottom:5px;}
-.w-sub{color:var(--muted);font-size:.68rem;letter-spacing:.12em;margin-bottom:18px;}
-.w-btns{display:flex;gap:8px;}
-.wb{
-  padding:10px 20px;border-radius:8px;
-  font-family:'Orbitron',sans-serif;font-size:.65rem;font-weight:700;
-  letter-spacing:.15em;cursor:pointer;border:none;transition:all .2s;
-}
-.wb-blue{background:linear-gradient(135deg,#0077cc,var(--blue));color:#fff;}
-.wb-blue:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,180,255,.4);}
-.wb-out{background:transparent;border:1px solid var(--border);color:var(--muted);}
-.wb-out:hover{border-color:var(--red);color:var(--red);}
-
-.g-msg{text-align:center;font-size:.65rem;color:var(--muted);margin-top:10px;min-height:18px;letter-spacing:.08em;}
-
-/* NOTIF */
-.notif{
-  position:fixed;top:14px;left:50%;transform:translateX(-50%);
-  background:var(--panel);border:1px solid var(--border2);
-  border-radius:8px;padding:9px 18px;font-size:.68rem;letter-spacing:.08em;
-  z-index:200;transition:opacity .3s;white-space:nowrap;pointer-events:none;
-}
-.notif.hidden{opacity:0;}
-
-/* LOADING */
-.loading-wrap{text-align:center;padding:36px 0;color:var(--muted);font-size:.7rem;letter-spacing:.2em;}
-.spinner{
-  display:inline-block;width:22px;height:22px;
-  border:2px solid var(--border);border-top-color:var(--blue);
-  border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.join-input{
-  text-align:center!important;letter-spacing:.4em!important;
-  font-size:1.2rem!important;font-family:'Orbitron',sans-serif!important;
-}
+.game-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.g-logo{font-family:'Orbitron',sans-serif;font-size:.6rem;color:var(--text-dim);letter-spacing:.2em}
+.turn-pill{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:.6rem;letter-spacing:.1em}
+.turn-pip{width:10px;height:10px;border-radius:50%;transition:all .3s}
+.scores-row{display:flex;gap:8px;margin-bottom:10px}
+.sc-card{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center;transition:all .3s;position:relative;overflow:hidden}
+.sc-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.sc-red::after{background:var(--red);box-shadow:0 0 8px var(--red)}
+.sc-yellow::after{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.sc-act-red{border-color:rgba(255,45,85,.5)!important;box-shadow:0 0 16px rgba(255,45,85,.12)!important}
+.sc-act-yellow{border-color:rgba(255,214,10,.5)!important;box-shadow:0 0 16px rgba(255,214,10,.12)!important}
+.sc-name{font-size:.58rem;letter-spacing:.06em;color:var(--text-dim);margin-bottom:4px}
+.sc-num{font-family:'Orbitron',sans-serif;font-size:1.5rem;font-weight:900}
+.sc-red .sc-num{color:var(--red)}
+.sc-yellow .sc-num{color:var(--yellow)}
+.board-wrap{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
+.hover-row{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px;height:24px}
+.harrow{display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:6px;transition:background .2s}
+.harrow:hover{background:rgba(255,255,255,.04)}
+.arr{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid transparent;transition:all .2s}
+.board{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cell{aspect-ratio:1;border-radius:50%;background:var(--bg);border:1px solid var(--border);cursor:pointer;transition:all .15s}
+.cell:hover{border-color:var(--dim)}
+.cell.red{background:var(--red);border-color:var(--red);box-shadow:0 0 10px rgba(255,45,85,.5),inset 0 -3px 6px rgba(0,0,0,.3);animation:pop .2s ease}
+.cell.yellow{background:var(--yellow);border-color:var(--yellow);box-shadow:0 0 10px rgba(255,214,10,.5),inset 0 -3px 6px rgba(0,0,0,.3);animation:pop .2s ease}
+.cell.win{animation:wpulse .65s ease infinite alternate!important}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+@keyframes wpulse{from{transform:scale(1)}to{transform:scale(1.12);filter:brightness(1.3)}}
+.game-hint{text-align:center;font-size:.65rem;color:var(--text-dim);letter-spacing:.1em;margin-top:9px;min-height:19px}
+.win-overlay{position:absolute;inset:0;background:rgba(8,8,16,.93);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;animation:fadeUp .3s ease}
+.we{font-size:2.6rem;margin-bottom:7px}
+.wt{font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;margin-bottom:4px}
+.ws{color:var(--text-dim);font-size:.68rem;letter-spacing:.15em;margin-bottom:18px}
+.wbtns{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.wbtn{padding:10px 22px;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.15em;cursor:pointer;border:none;transition:all .2s}
+.wbtn-play{background:linear-gradient(135deg,#007acc,var(--blue));color:#fff}
+.wbtn-play:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,170,255,.4)}
+.wbtn-leave{background:transparent;border:1px solid var(--border);color:var(--text-dim)}
+.wbtn-leave:hover{border-color:var(--red);color:var(--red)}
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 20px;font-size:.68rem;letter-spacing:.1em;z-index:100;pointer-events:none;transition:opacity .3s,transform .3s;white-space:nowrap}
+.toast.hide{opacity:0;transform:translateX(-50%) translateY(-6px)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:400px){.card{padding:18px 14px}.room-code{font-size:1.8rem}}
 </style>
 </head>
 <body>
 
-<div class="notif hidden" id="notif"></div>
+<div class="topbar" id="topbar" style="display:none">
+  <div class="tb-logo">CONNECT FOUR</div>
+  <div class="tb-right">
+    <div class="user-chip" id="tb-email">—</div>
+    <button class="btn-logout" onclick="logout()">LOGOUT</button>
+  </div>
+</div>
 
-<!-- ─── AUTH SCREEN ─── -->
+<div class="toast hide" id="toast"></div>
+
+<!-- AUTH -->
 <div class="screen" id="auth-screen">
   <div class="logo"><h1>CONNECT FOUR</h1><p>ONLINE MULTIPLAYER</p></div>
   <div class="card">
     <div class="tabs">
-      <div class="tab active" id="tab-login" onclick="switchTab('login')">LOGIN</div>
-      <div class="tab" id="tab-signup" onclick="switchTab('signup')">SIGN UP</div>
+      <button class="tab active" id="tab-login"  onclick="switchTab('login')">LOGIN</button>
+      <button class="tab"        id="tab-signup" onclick="switchTab('signup')">SIGN UP</button>
     </div>
-    <!-- Login -->
+    <!-- LOGIN -->
     <div id="form-login">
-      <div class="field"><label>Email</label><input id="l-email" type="email" placeholder="your@email.com"></div>
+      <div class="field"><label>Email</label><input id="l-email" type="email" placeholder="you@email.com"></div>
       <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••"></div>
-      <div style="height:6px"></div>
-      <button class="btn btn-red" onclick="doLogin()">LOGIN →</button>
-      <div class="err" id="l-err"></div>
+      <div style="height:4px"></div>
+      <button class="btn btn-primary" id="btn-login" onclick="doLogin()">LOGIN</button>
+      <div class="err" id="login-err"></div>
     </div>
-    <!-- Signup -->
-    <div id="form-signup" class="hidden">
-      <div class="field"><label>Username</label><input id="s-name" type="text" placeholder="Game mein naam" maxlength="15"></div>
-      <div class="field"><label>Email</label><input id="s-email" type="email" placeholder="your@email.com"></div>
+    <!-- SIGNUP -->
+    <div id="form-signup" style="display:none">
+      <div class="field"><label>Display Name</label><input id="s-name" type="text" placeholder="CoolPlayer99" maxlength="14"></div>
+      <div class="field"><label>Email</label><input id="s-email" type="email" placeholder="you@email.com"></div>
       <div class="field"><label>Password (min 6 chars)</label><input id="s-pass" type="password" placeholder="••••••••"></div>
-      <div style="height:6px"></div>
-      <button class="btn btn-red" onclick="doSignup()">CREATE ACCOUNT →</button>
-      <div class="err" id="s-err"></div>
-      <div class="suc hidden" id="s-ok">✓ Account ban gaya! Email confirm karo phir login karo.</div>
+      <div class="field">
+        <label>Apna Color Chuno</label>
+        <div class="color-pick">
+          <div class="color-opt red active" id="opt-red" onclick="pickColor('red')"><div class="dot"></div><span>RED</span></div>
+          <div class="color-opt yel"        id="opt-yel" onclick="pickColor('yellow')"><div class="dot"></div><span>YELLOW</span></div>
+        </div>
+      </div>
+      <div style="height:4px"></div>
+      <button class="btn btn-primary" id="btn-signup" onclick="doSignup()">ACCOUNT BANAO</button>
+      <div class="err" id="signup-err"></div>
+      <div class="suc" id="signup-ok"></div>
     </div>
   </div>
 </div>
 
-<!-- ─── MENU SCREEN ─── -->
+<!-- MENU -->
 <div class="screen hidden" id="menu-screen">
   <div class="logo"><h1>CONNECT FOUR</h1><p>ONLINE MULTIPLAYER</p></div>
   <div class="card">
-    <div class="u-badge">
-      <div><div class="u-name" id="m-uname">—</div><div class="u-email" id="m-uemail">—</div></div>
-      <button class="u-logout" onclick="doLogout()">LOGOUT</button>
+    <div class="card-title">// KHELO</div>
+    <button class="btn btn-primary" onclick="createRoom()">🎮 &nbsp;NAYA ROOM BANAO</button>
+    <div class="divider">YA</div>
+    <div class="field"><label>Room Code Daalo</label>
+      <input id="join-inp" type="text" placeholder="0000" maxlength="4"
+        style="text-align:center;letter-spacing:.5em;font-size:1.1rem;text-transform:uppercase">
     </div>
-    <div class="card-title">// NEW GAME</div>
-    <div class="field">
-      <label>Apna Color Choose Karo</label>
-      <div class="color-row">
-        <div class="c-opt red sel" id="copt-red" onclick="pickColor('red')">
-          <div class="c-dot"></div><span>RED</span>
-        </div>
-        <div class="c-opt yellow" id="copt-yellow" onclick="pickColor('yellow')">
-          <div class="c-dot"></div><span>YELLOW</span>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-red" onclick="doCreate()">CREATE NEW ROOM</button>
-    <div class="divider">YA DOST KA CODE DAALO</div>
-    <div class="field"><label>Room Code</label><input id="join-code" class="join-input" type="text" placeholder="0000" maxlength="4"></div>
-    <button class="btn btn-blue" onclick="doJoin()">JOIN ROOM →</button>
-    <div class="err" id="m-err"></div>
+    <button class="btn btn-blue" onclick="joinRoom()">ROOM JOIN KARO</button>
+    <div class="err" id="menu-err"></div>
   </div>
 </div>
 
-<!-- ─── LOBBY SCREEN ─── -->
+<!-- LOBBY -->
 <div class="screen hidden" id="lobby-screen">
   <div class="logo"><h1>CONNECT FOUR</h1><p>ONLINE MULTIPLAYER</p></div>
   <div class="card">
-    <div class="card-title">// LOBBY — DOST KA WAIT</div>
-    <div class="rc-box">
-      <div class="rc-lbl">YE CODE APNE DOST KO BHEJO (WhatsApp!)</div>
-      <div class="rc-code" id="lb-code">----</div>
+    <div class="card-title">// LOBBY</div>
+    <div class="room-box">
+      <div class="rl">ROOM CODE — Dost ko bhejo</div>
+      <div class="room-code" id="disp-code">----</div>
     </div>
-    <div class="p-slots" id="p-slots">
-      <div class="p-slot" id="pslot-1"><div class="ps-dot"></div><div class="ps-name">Waiting...</div></div>
-      <div class="p-slot" id="pslot-2"><div class="ps-dot"></div><div class="ps-name">Waiting...</div></div>
+    <div class="prow">
+      <div class="pslot" id="pslot-1"><div class="pdot"></div><div class="pname">—</div></div>
+      <div class="pslot" id="pslot-2"><div class="pdot"></div><div class="pname">Wait kar rahe hain...</div></div>
     </div>
-    <div class="lb-status"><span class="blink"></span><span id="lb-status">Dost ka wait kar rahe hain...</span></div>
-    <div style="height:16px"></div>
-    <button class="btn btn-ghost" onclick="doLeave()">ROOM CHHODO</button>
+    <div class="status-line">
+      <div class="ldot"></div>
+      <span id="lobby-msg">Opponent ka wait...</span>
+    </div>
+    <div style="height:14px"></div>
+    <button class="btn btn-ghost" style="margin:0" onclick="leaveRoom()">ROOM CHHODNA</button>
   </div>
 </div>
 
-<!-- ─── GAME SCREEN ─── -->
+<!-- GAME -->
 <div class="screen hidden" id="game-screen">
-  <div class="g-header">
+  <div class="game-top">
     <div class="g-logo">CONNECT FOUR</div>
-    <div class="turn-pill"><div class="t-pip" id="t-pip"></div><span id="t-txt">—</span></div>
-    <button class="leave-btn" onclick="doLeave()">LEAVE</button>
+    <div class="turn-pill"><div class="turn-pip" id="t-pip"></div><span id="t-txt">—</span></div>
   </div>
-  <div class="scores">
-    <div class="sc red" id="sc-me">
-      <div><div class="sc-name" id="sc-me-name">Me</div><div class="sc-lbl">YOU</div></div>
-      <div class="sc-num" id="sc-me-n">0</div>
-    </div>
-    <div class="sc yellow" id="sc-opp">
-      <div><div class="sc-name" id="sc-opp-name">Opp</div><div class="sc-lbl">OPPONENT</div></div>
-      <div class="sc-num" id="sc-opp-n">0</div>
-    </div>
+  <div class="scores-row">
+    <div class="sc-card sc-red"    id="sc-me" ><div class="sc-name" id="sc-me-n">Tum</div><div class="sc-num" id="sc-me-s">0</div></div>
+    <div class="sc-card sc-yellow" id="sc-opp"><div class="sc-name" id="sc-opp-n">Opponent</div><div class="sc-num" id="sc-opp-s">0</div></div>
   </div>
   <div class="board-wrap">
     <div class="hover-row" id="hover-row"></div>
-    <div class="board" id="board"></div>
-    <div class="win-ov hidden" id="win-ov">
-      <div class="w-emoji" id="w-emoji">🏆</div>
-      <div class="w-title" id="w-title">—</div>
-      <div class="w-sub" id="w-sub">—</div>
-      <div class="w-btns">
-        <button class="wb wb-blue" onclick="doRematch()">PLAY AGAIN</button>
-        <button class="wb wb-out" onclick="doLeave()">LEAVE</button>
+    <div class="board"     id="board"></div>
+    <div class="win-overlay hidden" id="win-ov">
+      <div class="we" id="w-emoji">🏆</div>
+      <div class="wt" id="w-title">—</div>
+      <div class="ws" id="w-sub">—</div>
+      <div class="wbtns">
+        <button class="wbtn wbtn-play"  onclick="requestRematch()">DOBARA KHELO</button>
+        <button class="wbtn wbtn-leave" onclick="leaveRoom()">BAHAR JAO</button>
       </div>
     </div>
   </div>
-  <div class="g-msg" id="g-msg"></div>
+  <div class="game-hint" id="g-hint"></div>
 </div>
 
 <script>
-const {createClient} = supabase;
-const DB = createClient(
-  'https://avojmvnplpoyklapplzu.supabase.co',
-  'sb_publishable_94SF0ksVLPCUh6O5CYiolg_3nawjxaV'
-);
+// ── CONFIG ────────────────────────────────────────────────
+const SURL = 'https://avojmvnplpoyklapplzu.supabase.co';
+const SKEY = 'sb_publishable_94SF0ksVLPCUh6O5CYiolg_3nawjxaV';
+const db   = window.supabase.createClient(SURL, SKEY);
 
-// STATE
-let me = null;           // { id, email, username }
-let myColor = 'red';
-let roomCode = '';
-let roomCh = null;
-let isMyTurn = false;
-let gameOver = false;
+// ── STATE ─────────────────────────────────────────────────
+let me         = null;   // { id, email, name, color }
+let myColor    = '';
+let prefColor  = 'red';
+let roomCode   = '';
+let isMyTurn   = false;
+let gameOver   = false;
+let channel    = null;
+let lastMoveId = null;
 const R=6, C=7;
 
-// ─── INIT ─────────────────────────────────────────────────────────
+// ── BOOT ──────────────────────────────────────────────────
 (async () => {
-  const {data:{user}} = await DB.auth.getUser();
-  if (user) {
-    const {data:p} = await DB.from('profiles').select('*').eq('id',user.id).single();
-    me = {id:user.id, email:user.email, username: p?.username || user.email.split('@')[0]};
-    showMenu();
-  } else {
-    showScreen('auth-screen');
-  }
+  const { data:{ session } } = await db.auth.getSession();
+  if (session?.user) setUser(session.user);
+
+  db.auth.onAuthStateChange((_, s) => {
+    if (s?.user) setUser(s.user);
+    else { me=null; hideTB(); goScreen('auth'); }
+  });
 })();
 
-// ─── AUTH TABS ─────────────────────────────────────────────────────
+function setUser(u) {
+  const m = u.user_metadata || {};
+  me = {
+    id:    u.id,
+    email: u.email,
+    name:  m.display_name || u.email.split('@')[0],
+    color: m.pref_color   || 'red'
+  };
+  prefColor = me.color;
+  showTB(u.email);
+  goScreen('menu');
+}
+
+// ── TOPBAR ────────────────────────────────────────────────
+function showTB(e) { document.getElementById('topbar').style.display='flex'; document.getElementById('tb-email').textContent=e; }
+function hideTB()  { document.getElementById('topbar').style.display='none'; }
+
+// ── TABS ──────────────────────────────────────────────────
+let activeTab = 'login';
 function switchTab(t) {
-  $('tab-login').classList.toggle('active', t==='login');
-  $('tab-signup').classList.toggle('active', t==='signup');
-  $('form-login').classList.toggle('hidden', t!=='login');
-  $('form-signup').classList.toggle('hidden', t!=='signup');
-  setErr('l-err',''); setErr('s-err','');
+  activeTab = t;
+  document.getElementById('form-login').style.display  = t==='login'  ? 'block' : 'none';
+  document.getElementById('form-signup').style.display = t==='signup' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',  t==='login');
+  document.getElementById('tab-signup').classList.toggle('active', t==='signup');
 }
-
-// ─── LOGIN ─────────────────────────────────────────────────────────
-async function doLogin() {
-  const email = $('l-email').value.trim();
-  const pw    = $('l-pass').value;
-  if (!email||!pw) return setErr('l-err','Email aur password daalo!');
-  setErr('l-err','Logging in...');
-  const {data,error} = await DB.auth.signInWithPassword({email,password:pw});
-  if (error) return setErr('l-err', mapErr(error.message));
-  const {data:p} = await DB.from('profiles').select('*').eq('id',data.user.id).single();
-  me = {id:data.user.id, email:data.user.email, username: p?.username || email.split('@')[0]};
-  showMenu();
-}
-
-// ─── SIGNUP ────────────────────────────────────────────────────────
-async function doSignup() {
-  const username = $('s-name').value.trim();
-  const email    = $('s-email').value.trim();
-  const pw       = $('s-pass').value;
-  if (!username) return setErr('s-err','Username daalo!');
-  if (!email)    return setErr('s-err','Email daalo!');
-  if (pw.length<6) return setErr('s-err','Password min 6 characters!');
-  setErr('s-err','Creating account...');
-  const {data,error} = await DB.auth.signUp({email,password:pw});
-  if (error) return setErr('s-err', mapErr(error.message));
-  if (data.user) {
-    await DB.from('profiles').upsert({id:data.user.id, email, username});
-    me = {id:data.user.id, email, username};
-  }
-  setErr('s-err','');
-  if (data.session) { showMenu(); }
-  else { $('s-ok').classList.remove('hidden'); }
-}
-
-// ─── LOGOUT ────────────────────────────────────────────────────────
-async function doLogout() {
-  await DB.auth.signOut();
-  me = null; roomCode = '';
-  showScreen('auth-screen');
-}
-
-// ─── MENU ──────────────────────────────────────────────────────────
-function showMenu() {
-  $('m-uname').textContent  = me.username;
-  $('m-uemail').textContent = me.email;
-  showScreen('menu-screen');
-}
-
 function pickColor(c) {
-  myColor = c;
-  $('copt-red').classList.toggle('sel', c==='red');
-  $('copt-yellow').classList.toggle('sel', c==='yellow');
+  prefColor = c;
+  document.getElementById('opt-red').classList.toggle('active', c==='red');
+  document.getElementById('opt-yel').classList.toggle('active', c==='yellow');
 }
 
-// ─── CREATE ROOM ───────────────────────────────────────────────────
-async function doCreate() {
-  setErr('m-err','');
-  const code = Math.floor(1000+Math.random()*9000).toString();
-  roomCode = code;
-  const {error} = await DB.from('rooms').insert({
-    code,
-    player1_id: me.id, player1_name: me.username, player1_color: myColor,
-    board: JSON.stringify(emptyBoard()),
-    turn:'red', status:'waiting',
-    scores: JSON.stringify({red:0,yellow:0})
+// ── SIGNUP ────────────────────────────────────────────────
+async function doSignup() {
+  const name  = document.getElementById('s-name').value.trim();
+  const email = document.getElementById('s-email').value.trim();
+  const pass  = document.getElementById('s-pass').value;
+  setE('signup-err',''); document.getElementById('signup-ok').textContent='';
+  if (!name)         return setE('signup-err','Display name daalo!');
+  if (!email)        return setE('signup-err','Email daalo!');
+  if (pass.length<6) return setE('signup-err','Password min 6 characters!');
+  setLoad('btn-signup', true, 'ACCOUNT BANAO');
+  const { error } = await db.auth.signUp({
+    email, password: pass,
+    options: { data: { display_name: name, pref_color: prefColor } }
   });
-  if (error) return setErr('m-err','Error: '+error.message);
-  $('lb-code').textContent = code;
-  showScreen('lobby-screen');
-  // Show my slot immediately
-  updateSlots({player1_name:me.username, player1_color:myColor, player2_name:null});
-  subscribeRoom(code,'lobby');
+  setLoad('btn-signup', false, 'ACCOUNT BANAO');
+  if (error) return setE('signup-err', error.message);
+  document.getElementById('signup-ok').textContent = '✓ Account ban gaya! Ab login karo.';
+  setTimeout(() => switchTab('login'), 1600);
 }
 
-// ─── JOIN ROOM ─────────────────────────────────────────────────────
-async function doJoin() {
-  setErr('m-err','');
-  const code = $('join-code').value.trim();
-  if (code.length!==4) return setErr('m-err','4-digit code daalo!');
+// ── LOGIN ─────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  setE('login-err','');
+  if (!email || !pass) return setE('login-err','Email aur password daalo!');
+  setLoad('btn-login', true, 'LOGIN');
+  const { error } = await db.auth.signInWithPassword({ email, password: pass });
+  setLoad('btn-login', false, 'LOGIN');
+  if (error) return setE('login-err','Email ya password galat hai!');
+}
+
+// ── LOGOUT ────────────────────────────────────────────────
+async function logout() {
+  if (roomCode) await leaveRoom();
+  await db.auth.signOut();
+}
+
+// ── CREATE ROOM ───────────────────────────────────────────
+async function createRoom() {
+  setE('menu-err','');
+  myColor  = prefColor;
+  roomCode = String(Math.floor(1000 + Math.random()*9000));
+
+  const { error } = await db.from('game_rooms').insert({
+    id:       roomCode,
+    board:    emptyB(),
+    turn:     'red',
+    status:   'waiting',
+    p1_id:    me.id,
+    p1_name:  me.name,
+    p1_color: myColor,
+    scores:   { red:0, yellow:0 }
+  });
+  if (error) return setE('menu-err', 'Room nahi bana: ' + error.message);
+
+  document.getElementById('disp-code').textContent = roomCode;
+  setSlot(1, me.name, myColor, true);
+  setSlot(2, null, null, false);
+  goScreen('lobby');
+  subscribe();
+}
+
+// ── JOIN ROOM ─────────────────────────────────────────────
+async function joinRoom() {
+  const code = document.getElementById('join-inp').value.trim();
+  setE('menu-err','');
+  if (code.length !== 4) return setE('menu-err','4-digit code daalo!');
+
+  const { data, error } = await db.from('game_rooms').select('*').eq('id', code).single();
+  if (error || !data) return setE('menu-err','Room nahi mila! Code check karo.');
+  if (data.status !== 'waiting') return setE('menu-err','Room already full hai!');
+
   roomCode = code;
-  const {data,error} = await DB.from('rooms').select('*').eq('code',code).single();
-  if (error||!data) return setErr('m-err','Room nahi mila! Code check karo.');
-  if (data.status!=='waiting') return setErr('m-err','Room full ya game shuru ho gayi!');
-  // Assign opposite color
-  myColor = data.player1_color==='red' ? 'yellow' : 'red';
-  const {error:e2} = await DB.from('rooms').update({
-    player2_id:me.id, player2_name:me.username, player2_color:myColor, status:'ready'
-  }).eq('code',code);
-  if (e2) return setErr('m-err','Join failed: '+e2.message);
-  $('lb-code').textContent = code;
-  showScreen('lobby-screen');
-  updateSlots({player1_name:data.player1_name,player1_color:data.player1_color,player2_name:me.username,player2_color:myColor});
-  $('lb-status').textContent = 'Dono players ready! Game shuru ho rahi hai...';
-  subscribeRoom(code,'game');
-  // Player 2 starts game directly after short delay
-  setTimeout(async () => {
-    const {data:fresh} = await DB.from('rooms').select('*').eq('code',code).single();
-    if (fresh) startGame(fresh);
-  }, 900);
+  myColor  = data.p1_color === 'red' ? 'yellow' : 'red';
+
+  const { error: e2 } = await db.from('game_rooms').update({
+    p2_id: me.id, p2_name: me.name, p2_color: myColor, status: 'ready'
+  }).eq('id', code);
+  if (e2) return setE('menu-err','Join nahi hua: ' + e2.message);
+
+  document.getElementById('disp-code').textContent = code;
+  setSlot(1, data.p1_name, data.p1_color, false);
+  setSlot(2, me.name, myColor, true);
+  goScreen('lobby');
+  subscribe();
 }
 
-// ─── SUBSCRIBE ─────────────────────────────────────────────────────
-function subscribeRoom(code, mode) {
-  if (roomCh) { DB.removeChannel(roomCh); roomCh=null; }
-  roomCh = DB.channel('room:'+code)
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rooms',filter:'code=eq.'+code},
-      ({new:d}) => {
-        if (mode==='lobby') handleLobbyUpd(d);
-        else handleGameUpd(d);
-      })
+// ── REALTIME ─────────────────────────────────────────────
+function subscribe() {
+  if (channel) channel.unsubscribe();
+  channel = db.channel('gr_' + roomCode)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public',
+      table: 'game_rooms', filter: `id=eq.${roomCode}`
+    }, ({ new: d }) => onUpdate(d))
     .subscribe();
 }
 
-// ─── LOBBY UPDATE ─────────────────────────────────────────────────
-let gameStarted = false;
-function handleLobbyUpd(d) {
-  updateSlots(d);
-  if ((d.status==='ready'||d.status==='playing') && !gameStarted) {
-    gameStarted = true;
-    $('lb-status').textContent = 'Dono ready! Game shuru ho rahi hai...';
-    subscribeRoom(roomCode,'game');
-    setTimeout(() => startGame(d), 800);
-  }
-}
-
-function updateSlots(d) {
-  const s1=$('pslot-1'), s2=$('pslot-2');
-  if (d.player1_name) {
-    s1.className='p-slot has-'+d.player1_color;
-    s1.querySelector('.ps-dot').style.cssText=`background:var(--${d.player1_color});box-shadow:0 0 8px var(--${d.player1_color})`;
-    s1.querySelector('.ps-name').textContent=d.player1_name+(d.player1_name===me.username?' (You)':'');
-  }
-  if (d.player2_name) {
-    s2.className='p-slot has-'+d.player2_color;
-    s2.querySelector('.ps-dot').style.cssText=`background:var(--${d.player2_color});box-shadow:0 0 8px var(--${d.player2_color})`;
-    s2.querySelector('.ps-name').textContent=d.player2_name+(d.player2_name===me.username?' (You)':'');
-  }
-}
-
-// ─── START GAME ────────────────────────────────────────────────────
-function startGame(d) {
-  gameStarted = false;
-  gameOver = false;
-  const board  = parse(d.board);
-  const scores = parse(d.scores);
-  const oppName = myColor==='red' ? d.player2_name : d.player1_name;
-  // Score card colors
-  $('sc-me').className  = 'sc '+myColor;
-  $('sc-opp').className = 'sc '+(myColor==='red'?'yellow':'red');
-  $('sc-me-name').textContent  = me.username;
-  $('sc-opp-name').textContent = oppName||'Opponent';
-  updateScores(scores);
-  buildBoard();
-  renderBoard(board);
-  updateTurn(d.turn);
-  $('win-ov').classList.add('hidden');
-  showScreen('game-screen');
-}
-
-// ─── GAME REALTIME ─────────────────────────────────────────────────
-function handleGameUpd(d) {
+async function onUpdate(d) {
   if (!d) return;
-  const board    = parse(d.board);
-  const scores   = parse(d.scores);
-  const winCells = d.win_cells ? parse(d.win_cells) : null;
-  renderBoard(board);
-  updateScores(scores);
-  if (d.status==='ended' && winCells) {
-    gameOver=true; highlightWin(winCells);
-    showWin(d.winner===myColor?'win':'lose'); return;
-  }
-  if (d.status==='draw') { gameOver=true; showWin('draw'); return; }
-  if (d.status==='rematch') {
-    setTimeout(()=>startGame({...d,board:JSON.stringify(emptyBoard()),status:'playing',winner:null,win_cells:null}),300);
+  const inLobby = !document.getElementById('lobby-screen').classList.contains('hidden');
+
+  // Both joined → start game
+  if (inLobby && (d.status === 'ready' || d.status === 'playing')) {
+    setSlot(1, d.p1_name, d.p1_color, d.p1_id === me.id);
+    setSlot(2, d.p2_name, d.p2_color, d.p2_id === me.id);
+    document.getElementById('lobby-msg').textContent = 'Dono aa gaye! Starting...';
+    setTimeout(() => startGame(d), 700);
     return;
   }
-  if (d.status==='left') { notif('Opponent ne chhod diya!'); setTimeout(doLeave,2000); return; }
-  updateTurn(d.turn);
+
+  // New move
+  if (d.last_move && d.last_move.id !== lastMoveId) {
+    lastMoveId = d.last_move.id;
+    renderBoard(d.board);
+    if (d.status === 'ended') {
+      gameOver = true;
+      if (d.win_cells) hlWin(d.win_cells);
+      updScores(d.scores);
+      showWin(d.winner === myColor, false);
+      return;
+    }
+    if (d.status === 'draw') { gameOver = true; showWin(false, true); return; }
+    updTurn(d.turn);
+  }
+
+  // Rematch accepted
+  if (d.rematch?.status === 'accepted') {
+    const fresh = { board:emptyB(), turn:'red', status:'playing', last_move:null, winner:null, win_cells:null, rematch:null };
+    await db.from('game_rooms').update(fresh).eq('id', roomCode);
+    const { data } = await db.from('game_rooms').select('*').eq('id', roomCode).single();
+    if (data) startGame(data);
+    return;
+  }
+  // Rematch requested by opponent
+  if (d.rematch?.status === 'requested' && d.rematch.by !== me.id) {
+    document.getElementById('w-title').textContent = 'REMATCH?';
+    document.getElementById('w-sub').textContent   = 'Opponent dobara khelna chahta hai!';
+  }
+  // Opponent left
+  if (d.status === 'abandoned' && !gameOver) {
+    toast('Opponent ne room chhod diya!', 'var(--red)');
+    setTimeout(() => leaveRoom(), 2000);
+  }
 }
 
-// ─── BUILD BOARD ───────────────────────────────────────────────────
+// ── LOBBY SLOTS ───────────────────────────────────────────
+function setSlot(n, name, color, isMe) {
+  const s = document.getElementById('pslot-' + n);
+  if (!name) { s.className='pslot'; s.querySelector('.pdot').style.background=''; s.querySelector('.pname').textContent='Wait kar rahe hain...'; return; }
+  s.className = 'pslot ' + (color==='red' ? 'pr' : 'py');
+  s.querySelector('.pdot').style.background = color==='red' ? 'var(--red)' : 'var(--yellow)';
+  s.querySelector('.pname').textContent = name + (isMe ? ' (Tum)' : '');
+}
+
+// ── START GAME ────────────────────────────────────────────
+function startGame(d) {
+  gameOver = false;
+  lastMoveId = d.last_move?.id || null;
+  const oppName  = d.p1_id === me.id ? d.p2_name : d.p1_name;
+  const oppColor = myColor === 'red' ? 'yellow' : 'red';
+  document.getElementById('sc-me').className  = 'sc-card sc-' + myColor;
+  document.getElementById('sc-opp').className = 'sc-card sc-' + oppColor;
+  document.getElementById('sc-me-n').textContent  = me.name + ' (Tum)';
+  document.getElementById('sc-opp-n').textContent = oppName || 'Opponent';
+  updScores(d.scores || {red:0,yellow:0});
+  buildBoard();
+  renderBoard(d.board);
+  updTurn(d.turn);
+  document.getElementById('win-ov').classList.add('hidden');
+  goScreen('game');
+}
+
+// ── BOARD ─────────────────────────────────────────────────
 function buildBoard() {
-  $('board').innerHTML = $('hover-row').innerHTML = '';
-  for (let col=0;col<C;col++) {
-    const h=mk('div','h-cell');
-    const arr=mk('div','h-arr'); arr.id='arr-'+col;
-    h.appendChild(arr);
-    h.onclick=()=>dropPiece(col);
-    h.onmouseenter=()=>setArr(col,true);
-    h.onmouseleave=()=>setArr(col,false);
-    $('hover-row').appendChild(h);
+  const b = document.getElementById('board');
+  const h = document.getElementById('hover-row');
+  b.innerHTML = ''; h.innerHTML = '';
+  for (let c=0; c<C; c++) {
+    const a = document.createElement('div'); a.className='harrow';
+    a.innerHTML = `<div class="arr" id="arr-${c}"></div>`;
+    a.onclick = () => drop(c);
+    a.onmouseenter = () => hov(c,1); a.onmouseleave = () => hov(c,0);
+    h.appendChild(a);
   }
-  for (let r=0;r<R;r++) for (let col=0;col<C;col++) {
-    const cell=mk('div','cell');
-    cell.id=`c-${r}-${col}`;
-    cell.onclick=()=>dropPiece(col);
-    cell.onmouseenter=()=>setArr(col,true);
-    cell.onmouseleave=()=>setArr(col,false);
-    $('board').appendChild(cell);
+  for (let r=0; r<R; r++) for (let c=0; c<C; c++) {
+    const el = document.createElement('div');
+    el.className = 'cell'; el.id = `g-${r}-${c}`;
+    el.onclick = () => drop(c);
+    el.onmouseenter = () => hov(c,1); el.onmouseleave = () => hov(c,0);
+    b.appendChild(el);
   }
 }
-
-function setArr(col,on) {
+function hov(c,on) {
   if (!isMyTurn||gameOver) return;
-  const el=$('arr-'+col);
-  if (el) el.style.borderTopColor=on?`var(--${myColor})`:'transparent';
+  const a = document.getElementById('arr-'+c);
+  if (a) a.style.borderTopColor = on ? (myColor==='red'?'var(--red)':'var(--yellow)') : 'transparent';
 }
-
 function renderBoard(board) {
-  for (let r=0;r<R;r++) for (let col=0;col<C;col++) {
-    const el=$(`c-${r}-${col}`);
-    if (el) el.className='cell'+(board[r][col]?' '+board[r][col]:'');
+  for (let r=0;r<R;r++) for (let c=0;c<C;c++) {
+    const el = document.getElementById(`g-${r}-${c}`);
+    if (el) el.className = 'cell' + (board[r][c] ? ' '+board[r][c] : '');
   }
 }
 
-// ─── TURN UI ───────────────────────────────────────────────────────
-function updateTurn(turn) {
-  isMyTurn = (turn===myColor) && !gameOver;
-  const pip=$('t-pip');
-  pip.style.background    = `var(--${turn})`;
-  pip.style.boxShadow     = `0 0 6px var(--${turn})`;
-  $('t-txt').textContent  = isMyTurn ? 'YOUR TURN' : "OPP'S TURN";
-  $('g-msg').textContent  = isMyTurn ? '▼ Column pe click karo' : '';
-  $('sc-me').classList.toggle('glow-'+myColor, isMyTurn);
-  $('sc-opp').classList.toggle('glow-'+(myColor==='red'?'yellow':'red'), !isMyTurn);
+// ── TURN ──────────────────────────────────────────────────
+function updTurn(turn) {
+  isMyTurn = (turn === myColor) && !gameOver;
+  const col = turn==='red' ? 'var(--red)' : 'var(--yellow)';
+  document.getElementById('t-pip').style.cssText = `background:${col};box-shadow:0 0 8px ${col}`;
+  document.getElementById('t-txt').textContent   = isMyTurn ? 'TUMHARI BAARI' : "OPPONENT KI BAARI";
+  document.getElementById('g-hint').textContent  = isMyTurn ? '▼ Column pe click karo' : '';
+  const oc = myColor==='red'?'yellow':'red';
+  document.getElementById('sc-me').classList.toggle('sc-act-'+myColor, isMyTurn);
+  document.getElementById('sc-me').classList.remove('sc-act-'+oc);
+  document.getElementById('sc-opp').classList.toggle('sc-act-'+oc,    !isMyTurn);
+  document.getElementById('sc-opp').classList.remove('sc-act-'+myColor);
+}
+function updScores(s) {
+  document.getElementById('sc-me-s').textContent  = s[myColor] || 0;
+  document.getElementById('sc-opp-s').textContent = s[myColor==='red'?'yellow':'red'] || 0;
 }
 
-function updateScores(s) {
-  $('sc-me-n').textContent  = s[myColor]||0;
-  $('sc-opp-n').textContent = s[myColor==='red'?'yellow':'red']||0;
-}
+// ── DROP ──────────────────────────────────────────────────
+async function drop(col) {
+  if (!isMyTurn || gameOver) return;
+  isMyTurn = false;
+  const { data, error } = await db.from('game_rooms').select('*').eq('id', roomCode).single();
+  if (error || !data || data.turn !== myColor) { isMyTurn=true; return; }
 
-// ─── DROP PIECE ────────────────────────────────────────────────────
-async function dropPiece(col) {
-  if (!isMyTurn||gameOver) return;
-  isMyTurn=false;
-  const {data:room} = await DB.from('rooms').select('*').eq('code',roomCode).single();
-  if (!room||room.turn!==myColor) { isMyTurn=true; return; }
-  const board = parse(room.board);
-  let row=-1;
-  for (let r=R-1;r>=0;r--) { if (!board[r][col]){row=r;break;} }
-  if (row===-1) { isMyTurn=true; return notif('Column full hai!'); }
-  board[row][col]=myColor;
-  const winner=checkWin(board,row,col,myColor);
-  const draw=!winner&&board[0].every(c=>c!==null);
-  const scores=parse(room.scores);
-  let upd={board:JSON.stringify(board),last_move_id:Date.now().toString()};
-  if (winner) {
-    scores[myColor]=(scores[myColor]||0)+1;
-    upd={...upd,status:'ended',winner:myColor,win_cells:JSON.stringify(winner),scores:JSON.stringify(scores)};
-    renderBoard(board); highlightWin(winner); showWin('win'); updateScores(scores);
-  } else if (draw) {
-    upd={...upd,status:'draw'};
-    renderBoard(board); showWin('draw');
+  let row = -1;
+  for (let r=R-1; r>=0; r--) if (!data.board[r][col]) { row=r; break; }
+  if (row === -1) { isMyTurn=true; toast('Column full hai!','var(--red)'); return; }
+
+  data.board[row][col] = myColor;
+  const mv = { row, col, color:myColor, id:Date.now() };
+  const wc = checkWin(data.board, row, col, myColor);
+  const isDraw = !wc && data.board[0].every(x=>x!==null);
+
+  const upd = { board:data.board, last_move:mv };
+  if (wc) {
+    upd.status='ended'; upd.winner=myColor; upd.win_cells=wc;
+    upd.scores = { ...data.scores, [myColor]:(data.scores[myColor]||0)+1 };
+  } else if (isDraw) {
+    upd.status = 'draw';
   } else {
-    upd={...upd,turn:myColor==='red'?'yellow':'red',status:'playing'};
-    renderBoard(board); updateTurn(upd.turn);
+    upd.turn = myColor==='red' ? 'yellow' : 'red';
   }
-  await DB.from('rooms').update(upd).eq('code',roomCode);
+
+  await db.from('game_rooms').update(upd).eq('id', roomCode);
+  renderBoard(data.board);
+  if (wc) { gameOver=true; hlWin(wc); updScores(upd.scores); showWin(true, false); }
+  else if (isDraw) { gameOver=true; showWin(false, true); }
+  else updTurn(upd.turn);
 }
 
-// ─── WIN CHECK ─────────────────────────────────────────────────────
+// ── WIN CHECK ─────────────────────────────────────────────
 function checkWin(board,row,col,color) {
   const dirs=[[0,1],[1,0],[1,1],[1,-1]];
-  for (const [dr,dc] of dirs) {
+  for (const[dr,dc]of dirs) {
     let cells=[[row,col]];
-    for (let d=1;d<=3;d++){const r=row+dr*d,c=col+dc*d;if(r>=0&&r<R&&c>=0&&c<C&&board[r][c]===color)cells.push([r,c]);else break;}
-    for (let d=1;d<=3;d++){const r=row-dr*d,c=col-dc*d;if(r>=0&&r<R&&c>=0&&c<C&&board[r][c]===color)cells.push([r,c]);else break;}
-    if (cells.length>=4) return cells;
+    for(let d=1;d<=3;d++){const r=row+dr*d,c=col+dc*d;if(r>=0&&r<R&&c>=0&&c<C&&board[r][c]===color)cells.push([r,c]);else break;}
+    for(let d=1;d<=3;d++){const r=row-dr*d,c=col-dc*d;if(r>=0&&r<R&&c>=0&&c<C&&board[r][c]===color)cells.push([r,c]);else break;}
+    if(cells.length>=4)return cells;
   }
   return null;
 }
+function hlWin(cells) { cells.forEach(([r,c])=>{ const el=document.getElementById(`g-${r}-${c}`); if(el)el.classList.add('win'); }); }
 
-function highlightWin(cells) {
-  cells.forEach(([r,c])=>{const el=$(`c-${r}-${c}`);if(el)el.classList.add('win');});
+function showWin(iWon, isDraw) {
+  document.getElementById('win-ov').classList.remove('hidden');
+  const em=document.getElementById('w-emoji'), tt=document.getElementById('w-title'), ss=document.getElementById('w-sub');
+  if (isDraw)     { em.textContent='🤝'; tt.textContent='DRAW!';    tt.style.color='var(--blue)';     ss.textContent='Koi nahi jeeta!'; }
+  else if (iWon)  { em.textContent='🏆'; tt.textContent='TUM JEET GAYE!'; tt.style.color='var(--yellow)'; ss.textContent='Zabardast khela!'; }
+  else            { em.textContent='😅'; tt.textContent='TUM HARE'; tt.style.color='var(--text-dim)'; ss.textContent='Agle game mein jeeto!'; }
 }
 
-// ─── WIN OVERLAY ───────────────────────────────────────────────────
-function showWin(result) {
-  gameOver=true;
-  const ov=$('win-ov'),emoji=$('w-emoji'),title=$('w-title'),sub=$('w-sub');
-  ov.classList.remove('hidden');
-  if (result==='win') {
-    emoji.textContent='🏆'; title.textContent='YOU WON!';
-    title.style.color='var(--yellow)'; sub.textContent='Zabardast khela!';
-  } else if (result==='lose') {
-    emoji.textContent='😔'; title.textContent='YOU LOST';
-    title.style.color='var(--muted)'; sub.textContent='Agli baar pakka jeetoge!';
+// ── REMATCH ───────────────────────────────────────────────
+async function requestRematch() {
+  const { data } = await db.from('game_rooms').select('rematch,scores').eq('id', roomCode).single();
+  if (!data) return;
+  if (data.rematch?.status==='requested' && data.rematch.by!==me.id) {
+    const fresh = { board:emptyB(), turn:'red', status:'playing', last_move:null, winner:null, win_cells:null, rematch:{status:'accepted'} };
+    await db.from('game_rooms').update(fresh).eq('id', roomCode);
+    const { data:d2 } = await db.from('game_rooms').select('*').eq('id', roomCode).single();
+    if (d2) startGame(d2);
   } else {
-    emoji.textContent='🤝'; title.textContent='DRAW!';
-    title.style.color='var(--blue)'; sub.textContent='Koi winner nahi is baar';
+    await db.from('game_rooms').update({ rematch:{ status:'requested', by:me.id } }).eq('id', roomCode);
+    toast('Rematch request bheja!','var(--blue)');
+    document.getElementById('w-sub').textContent = 'Opponent ke jawab ka wait...';
   }
 }
 
-// ─── REMATCH ───────────────────────────────────────────────────────
-async function doRematch() {
-  await DB.from('rooms').update({
-    board:JSON.stringify(emptyBoard()),turn:'red',
-    status:'rematch',winner:null,win_cells:null,
-    last_move_id:Date.now().toString()
-  }).eq('code',roomCode);
-  const {data} = await DB.from('rooms').select('*').eq('code',roomCode).single();
-  if (data) startGame(data);
+// ── LEAVE ─────────────────────────────────────────────────
+async function leaveRoom() {
+  if (channel) { channel.unsubscribe(); channel=null; }
+  if (roomCode) {
+    await db.from('game_rooms').update({ status:'abandoned' }).eq('id', roomCode);
+    roomCode = '';
+  }
+  gameOver=false; isMyTurn=false;
+  document.getElementById('join-inp').value = '';
+  goScreen('menu');
 }
 
-// ─── LEAVE ─────────────────────────────────────────────────────────
-async function doLeave() {
-  if (roomCh) { DB.removeChannel(roomCh); roomCh=null; }
-  if (roomCode) await DB.from('rooms').update({status:'left'}).eq('code',roomCode);
-  roomCode='';
-  showMenu();
+// ── HELPERS ───────────────────────────────────────────────
+function emptyB() { return Array(R).fill(null).map(()=>Array(C).fill(null)); }
+function goScreen(n) {
+  ['auth','menu','lobby','game'].forEach(x=>document.getElementById(x+'-screen').classList.add('hidden'));
+  document.getElementById(n+'-screen').classList.remove('hidden');
 }
+function setE(id,msg) { document.getElementById(id).textContent=msg; }
+let toastT;
+function toast(msg,color='var(--text)') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.color=color; t.classList.remove('hide');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.add('hide'),2500);
+}
+function setLoad(id,on,label) { const b=document.getElementById(id); b.innerHTML=on?`<span class="spin"></span>Loading...`:label; b.disabled=on; }
 
-// ─── UTILS ─────────────────────────────────────────────────────────
-function emptyBoard(){return Array(R).fill(null).map(()=>Array(C).fill(null));}
-function parse(v){if(!v)return null;try{return typeof v==='string'?JSON.parse(v):v;}catch{return v;}}
-function $(id){return document.getElementById(id);}
-function mk(tag,cls){const el=document.createElement(tag);if(cls)el.className=cls;return el;}
-function showScreen(id){
-  ['auth-screen','menu-screen','lobby-screen','game-screen'].forEach(s=>$(s).classList.add('hidden'));
-  $(id)?.classList.remove('hidden');
-}
-function setErr(id,msg){const el=$(id);if(el)el.textContent=msg;}
-function notif(msg) {
-  const n=$('notif'); n.textContent=msg;
-  n.classList.remove('hidden'); setTimeout(()=>n.classList.add('hidden'),2500);
-}
-function mapErr(msg) {
-  if (msg.includes('Invalid login')) return 'Email ya password galat hai!';
-  if (msg.includes('already registered')) return 'Email already use ho rahi hai!';
-  if (msg.includes('Email not confirmed')) return 'Pehle email confirm karo!';
-  return msg;
-}
-
-// Enter key shortcuts
 document.addEventListener('keydown', e => {
   if (e.key!=='Enter') return;
-  const scr=document.querySelector('.screen:not(.hidden)');
-  if (!scr) return;
-  if (scr.id==='auth-screen') $('form-login').classList.contains('hidden')?doSignup():doLogin();
-  if (scr.id==='menu-screen') { if($('join-code').value) doJoin(); else doCreate(); }
+  if (!document.getElementById('auth-screen').classList.contains('hidden'))
+    activeTab==='login' ? doLogin() : doSignup();
+  if (!document.getElementById('menu-screen').classList.contains('hidden') &&
+      document.activeElement===document.getElementById('join-inp'))
+    joinRoom();
 });
 </script>
 </body>

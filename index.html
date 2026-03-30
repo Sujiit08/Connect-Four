@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tic Tac Toe — Online Multiplayer</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#080810">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tic Tac Toe">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -216,10 +223,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
         <div class="mc-title">VS COMPUTER</div>
         <div class="mc-sub">Akele khelo AI se</div>
       </div>
-      <div class="mode-card" onclick="goOnlineMode()">
-        <div class="mc-icon">👥</div>
-        <div class="mc-title">VS PLAYER</div>
-        <div class="mc-sub">Dost ke saath online</div>
+      <div class="mode-card" onclick="goLocalMode()">
+        <div class="mc-icon">🤝</div>
+        <div class="mc-title">LOCAL 2P</div>
+        <div class="mc-sub">Saath baithke khelo</div>
+      </div>
+      <div class="mode-card" style="grid-column:1/-1" onclick="goOnlineMode()">
+        <div class="mc-icon">🌐</div>
+        <div class="mc-title">VS PLAYER ONLINE</div>
+        <div class="mc-sub">Dost ke saath alag device se — Room Code se connect karo</div>
       </div>
     </div>
   </div>
@@ -247,6 +259,25 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     </div>
     <div style="height:6px"></div>
     <button class="btn btn-green" onclick="startAIGame()">KHELO! 🎮</button>
+    <button class="btn btn-ghost" onclick="goScreen('menu')">WAPAS</button>
+  </div>
+</div>
+
+<!-- ══ LOCAL MODE SCREEN ══ -->
+<div class="screen hidden" id="local-screen">
+  <div class="logo"><h1>TIC TAC TOE</h1><p>LOCAL 2 PLAYER</p></div>
+  <div class="card">
+    <div class="card-title">// PLAYER NAMES DAALO</div>
+    <div class="field">
+      <label>❌ Player 1 ka Naam</label>
+      <input id="lp1-name" type="text" placeholder="Player 1" maxlength="12">
+    </div>
+    <div class="field">
+      <label>⭕ Player 2 ka Naam</label>
+      <input id="lp2-name" type="text" placeholder="Player 2" maxlength="12">
+    </div>
+    <div style="height:6px"></div>
+    <button class="btn btn-green" onclick="startLocalGame()">KHELO! 🎮</button>
     <button class="btn btn-ghost" onclick="goScreen('menu')">WAPAS</button>
   </div>
 </div>
@@ -428,8 +459,108 @@ async function logout(){
 // ══════════════════════════════════════════════════════
 //  MENU NAVIGATION
 // ══════════════════════════════════════════════════════
-function goAIMode()     { goScreen('ai'); }
-function goOnlineMode() { goScreen('online'); }
+function goAIMode()    { goScreen('ai'); }
+function goOnlineMode(){ goScreen('online'); }
+function goLocalMode() { goScreen('local'); }
+
+// ══════════════════════════════════════════════════════
+//  LOCAL 2-PLAYER MODE
+// ══════════════════════════════════════════════════════
+let localBoard   = Array(9).fill(null);
+let localTurn    = 'X';   // 'X' or 'O'
+let localScores  = { X:0, O:0 };
+let localNames   = { X:'Player 1', O:'Player 2' };
+let isLocalMode  = false;
+
+function startLocalGame(){
+  const p1 = document.getElementById('lp1-name').value.trim() || 'Player 1';
+  const p2 = document.getElementById('lp2-name').value.trim() || 'Player 2';
+  isLocalMode  = true;
+  isAIMode     = false;
+  localNames   = { X:p1, O:p2 };
+  localBoard   = Array(9).fill(null);
+  localTurn    = 'X';
+  localScores  = { X:0, O:0 };
+  mySym        = 'X';
+
+  document.getElementById('g-logo-txt').textContent = 'TIC TAC TOE — LOCAL';
+  document.getElementById('sc-me').className        = 'sc-card sc-x';
+  document.getElementById('sc-opp').className       = 'sc-card sc-o';
+  document.getElementById('sc-me-n').textContent    = p1 + ' ❌';
+  document.getElementById('sc-opp-n').textContent   = p2 + ' ⭕';
+  document.getElementById('sc-me-s').textContent    = 0;
+  document.getElementById('sc-opp-s').textContent   = 0;
+  document.getElementById('win-ov').classList.add('hidden');
+  gameOver = false;
+
+  buildTTTBoard(false, true); // local=true
+  renderTTT(localBoard);
+  updLocalTurnUI();
+  goScreen('game');
+}
+
+function clickLocal(i){
+  if(gameOver || localBoard[i]) return;
+  localBoard[i] = localTurn;
+  renderTTT(localBoard);
+
+  const wl = checkTTTWin(localBoard, localTurn);
+  const isDraw = !wl && localBoard.every(x=>x!==null);
+
+  if(wl){
+    gameOver = true;
+    hlTTT(wl);
+    localScores[localTurn]++;
+    // update scoreboard
+    document.getElementById('sc-me-s').textContent  = localScores['X'];
+    document.getElementById('sc-opp-s').textContent = localScores['O'];
+    showLocalWin(localTurn, false);
+    return;
+  }
+  if(isDraw){ gameOver=true; showLocalWin(null, true); return; }
+
+  localTurn = localTurn==='X' ? 'O' : 'X';
+  updLocalTurnUI();
+}
+
+function updLocalTurnUI(){
+  const name = localNames[localTurn];
+  document.getElementById('t-sym').textContent = localTurn==='X' ? '❌' : '⭕';
+  document.getElementById('t-txt').textContent = name.toUpperCase() + ' KI BAARI';
+  document.getElementById('g-hint').textContent = 'Koi bhi box pe click karo';
+
+  // Highlight active player card
+  document.getElementById('sc-me').classList.toggle('sc-act-x',  localTurn==='X');
+  document.getElementById('sc-me').classList.remove('sc-act-o');
+  document.getElementById('sc-opp').classList.toggle('sc-act-o', localTurn==='O');
+  document.getElementById('sc-opp').classList.remove('sc-act-x');
+}
+
+function showLocalWin(sym, isDraw){
+  document.getElementById('win-ov').classList.remove('hidden');
+  const em=document.getElementById('w-emoji'), tt=document.getElementById('w-title'), ss=document.getElementById('w-sub');
+  if(isDraw){
+    em.textContent='🤝'; tt.textContent='DRAW!'; tt.style.color='var(--blue)';
+    ss.textContent='Koi nahi jeeta!';
+  } else {
+    const winner = localNames[sym];
+    em.textContent = sym==='X' ? '❌' : '⭕';
+    tt.textContent = winner.toUpperCase() + ' JEETA!';
+    tt.style.color = sym==='X' ? 'var(--x)' : 'var(--o)';
+    ss.textContent = 'Badiya khela ' + winner + '!';
+  }
+}
+
+function resetLocalGame(){
+  localBoard  = Array(9).fill(null);
+  localTurn   = 'X';
+  gameOver    = false;
+  buildTTTBoard(false, true);
+  renderTTT(localBoard);
+  document.getElementById('win-ov').classList.add('hidden');
+  updLocalTurnUI();
+}
+
 
 // ══════════════════════════════════════════════════════
 //  AI MODE SETUP
@@ -660,13 +791,15 @@ function startOnlineGame(d){
 // ══════════════════════════════════════════════════════
 //  BOARD BUILD & RENDER
 // ══════════════════════════════════════════════════════
-function buildTTTBoard(ai){
+function buildTTTBoard(ai, local=false){
   const b=document.getElementById('ttt-board');
   b.innerHTML='';
   for(let i=0;i<9;i++){
     const c=document.createElement('div');
     c.className='ttt-cell'; c.id='c'+i;
-    c.onclick=()=>ai?clickAI(i):clickOnline(i);
+    if(local)       c.onclick=()=>clickLocal(i);
+    else if(ai)     c.onclick=()=>clickAI(i);
+    else            c.onclick=()=>clickOnline(i);
     b.appendChild(c);
   }
 }
@@ -786,12 +919,14 @@ function showWin(iWon,isDraw){
 //  PLAY AGAIN / LEAVE
 // ══════════════════════════════════════════════════════
 function onPlayAgain(){
-  if(isAIMode){ resetAIGame(); }
-  else        { requestRematch(); }
+  if(isLocalMode) { resetLocalGame(); }
+  else if(isAIMode) { resetAIGame(); }
+  else { requestRematch(); }
 }
 function onLeave(){
-  if(isAIMode){ isAIMode=false; goScreen('menu'); }
-  else        { leaveRoom(); }
+  if(isLocalMode) { isLocalMode=false; goScreen('menu'); }
+  else if(isAIMode) { isAIMode=false; goScreen('menu'); }
+  else { leaveRoom(); }
 }
 
 function resetAIGame(){
@@ -833,7 +968,7 @@ async function leaveRoom(){
 //  HELPERS
 // ══════════════════════════════════════════════════════
 function goScreen(n){
-  ['auth','menu','ai','online','lobby','game'].forEach(x=>{
+  ['auth','menu','ai','local','online','lobby','game'].forEach(x=>{
     const el=document.getElementById(x+'-screen');
     if(el)el.classList.add('hidden');
   });
@@ -847,6 +982,13 @@ function toast(msg,color='var(--text)'){
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.add('hide'),2500);
 }
 function setLoad(id,on,label){const b=document.getElementById(id);b.innerHTML=on?`<span class="spin"></span>Loading...`:label;b.disabled=on;}
+
+// ── SERVICE WORKER ───────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
 
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
